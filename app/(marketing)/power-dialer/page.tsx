@@ -21,6 +21,9 @@ import {
   Zap,
   Timer,
   TrendingUp,
+  Calculator,
+  ChevronRight,
+  Target,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -46,6 +49,7 @@ const faqs = [
   { q: 'Is there a limit on campaigns?', a: 'There is no limit on the number of campaigns. Your plan determines the number of concurrent agent seats and dialing minutes available.' },
 ]
 
+// ─── Dialer Preview Component ────────────────────────────────────────────────
 function DialerPreview() {
   const campaign = campaigns[0]
   const currentContact = dialerContacts[2]
@@ -67,6 +71,13 @@ function DialerPreview() {
             <Button variant="outline" size="sm"><Pause className="size-3.5" /> Pause</Button>
             <Button variant="outline" size="sm"><Settings className="size-3.5" /></Button>
           </div>
+        </div>
+        {/* Progress bar */}
+        <div className="mt-4 h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+          <div
+            className="h-full rounded-full bg-success transition-all"
+            style={{ width: `${(campaign.callsCompleted / campaign.contactCount) * 100}%` }}
+          />
         </div>
       </div>
 
@@ -168,6 +179,129 @@ function DialerPreview() {
   )
 }
 
+// ─── Throughput Calculator ────────────────────────────────────────────────────
+function ThroughputCalculator() {
+  const [agents, setAgents] = React.useState(5)
+  const [contactsPerList, setContactsPerList] = React.useState(500)
+  const [avgTalkTime, setAvgTalkTime] = React.useState(3) // minutes
+
+  // Assumptions: ~40% connect rate, 1 min between calls
+  const connectRate = 0.4
+  const wrapTime = 1 // min
+
+  const callsPerAgentHour = Math.floor(60 / (avgTalkTime * connectRate + wrapTime + (avgTalkTime * (1 - connectRate) * 0.3)))
+  const callsPerHourTotal = callsPerAgentHour * agents
+  const listCompletionHours = Math.ceil(contactsPerList / callsPerHourTotal)
+  const expectedConnections = Math.round(contactsPerList * connectRate)
+  const manualCallsPerHour = Math.floor(60 / (avgTalkTime + 5)) // 5 min admin overhead per call manually
+
+  const speedupMultiple = Math.round((callsPerHourTotal / (manualCallsPerHour * agents)) * 10) / 10
+
+  return (
+    <div className="rounded-2xl border border-border/70 bg-card p-6 sm:p-8 shadow-[var(--shadow-card)]">
+      <div className="flex items-center gap-3 mb-6">
+        <span className="flex size-10 items-center justify-center rounded-xl bg-success/10 text-success">
+          <Calculator className="size-5" />
+        </span>
+        <div>
+          <h3 className="font-display text-lg font-bold text-foreground">Throughput Calculator</h3>
+          <p className="text-sm text-muted-foreground">Estimate your outbound calling velocity</p>
+        </div>
+      </div>
+
+      <div className="grid sm:grid-cols-3 gap-6 mb-8">
+        {/* Agents slider */}
+        <div>
+          <div className="flex justify-between mb-2">
+            <label className="text-xs font-semibold text-muted-foreground uppercase">Agents</label>
+            <span className="text-sm font-bold text-foreground">{agents}</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={50}
+            value={agents}
+            onChange={(e) => setAgents(Number(e.target.value))}
+            className="w-full accent-success"
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+            <span>1</span><span>50</span>
+          </div>
+        </div>
+
+        {/* Contacts slider */}
+        <div>
+          <div className="flex justify-between mb-2">
+            <label className="text-xs font-semibold text-muted-foreground uppercase">Contact List Size</label>
+            <span className="text-sm font-bold text-foreground">{contactsPerList.toLocaleString()}</span>
+          </div>
+          <input
+            type="range"
+            min={50}
+            max={5000}
+            step={50}
+            value={contactsPerList}
+            onChange={(e) => setContactsPerList(Number(e.target.value))}
+            className="w-full accent-success"
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+            <span>50</span><span>5,000</span>
+          </div>
+        </div>
+
+        {/* Avg talk time slider */}
+        <div>
+          <div className="flex justify-between mb-2">
+            <label className="text-xs font-semibold text-muted-foreground uppercase">Avg Talk Time</label>
+            <span className="text-sm font-bold text-foreground">{avgTalkTime} min</span>
+          </div>
+          <input
+            type="range"
+            min={1}
+            max={15}
+            value={avgTalkTime}
+            onChange={(e) => setAvgTalkTime(Number(e.target.value))}
+            className="w-full accent-success"
+          />
+          <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+            <span>1 min</span><span>15 min</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Results */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {[
+          { label: 'Calls / Hour', value: callsPerHourTotal, suffix: '', highlight: false },
+          { label: 'List Completion', value: listCompletionHours, suffix: ' hrs', highlight: false },
+          { label: 'Expected Connects', value: expectedConnections, suffix: '', highlight: false },
+          { label: 'Speed vs Manual', value: speedupMultiple, suffix: 'x', highlight: true },
+        ].map((r) => (
+          <div
+            key={r.label}
+            className={`rounded-xl border p-4 text-center ${
+              r.highlight
+                ? 'border-success/30 bg-success/5'
+                : 'border-border/60 bg-secondary/30'
+            }`}
+          >
+            <p className={`font-display text-2xl font-extrabold ${r.highlight ? 'text-success' : 'text-foreground'}`}>
+              {typeof r.value === 'number' && r.value % 1 !== 0 ? r.value.toFixed(1) : r.value}
+              {r.suffix}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">{r.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <p className="text-[11px] text-muted-foreground mt-4">
+        * Estimated based on 40% connect rate, {wrapTime} min wrap time, and 3-line predictive dialing. Actual results vary by list quality.
+      </p>
+    </div>
+  )
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function PowerDialerPage() {
   const campaign = campaigns[0]
   return (
@@ -249,6 +383,19 @@ export default function PowerDialerPage() {
               </Reveal>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Throughput Calculator */}
+      <section className="px-4 pt-20">
+        <div className="mx-auto max-w-4xl">
+          <SectionHeading
+            title="See how many more calls you'd make"
+            description="Adjust the sliders to calculate your team's estimated calling throughput with Power Dialer."
+          />
+          <Reveal className="mt-10">
+            <ThroughputCalculator />
+          </Reveal>
         </div>
       </section>
 

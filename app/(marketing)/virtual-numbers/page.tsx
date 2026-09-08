@@ -45,89 +45,143 @@ function NumberSearchDemo() {
   const [numberType, setNumberType] = React.useState<string>('local')
   const [results, setResults] = React.useState(searchableNumbers)
   const [searched, setSearched] = React.useState(false)
+  const [isSearching, setIsSearching] = React.useState(false)
+  const [quantity, setQuantity] = React.useState(3)
 
-  function handleSearch() {
-    const filtered = searchableNumbers.filter((n) => {
-      if (n.countryCode !== selectedCountry) return false
-      if (numberType && n.type !== numberType) return false
-      return true
-    })
-    setResults(filtered.length > 0 ? filtered : searchableNumbers.slice(0, 3))
-    setSearched(true)
+  async function handleSearch() {
+    setIsSearching(true)
+    try {
+      const filtered = searchableNumbers.filter((n) => {
+        if (n.countryCode !== selectedCountry) return false
+        if (numberType && n.type !== numberType) return false
+        return true
+      })
+      setResults(filtered.length > 0 ? filtered : searchableNumbers.slice(0, 3))
+      setSearched(true)
+    } finally {
+      setIsSearching(false)
+    }
   }
 
+  const estimatedMonthly = quantity * (numberType === 'toll-free' ? 5 : 3)
+
   return (
-    <div className="rounded-2xl border border-border/70 bg-card p-6 shadow-[var(--shadow-card)] sm:p-8">
-      <h3 className="font-display text-xl font-bold text-foreground">Search available numbers</h3>
-      <p className="mt-2 text-sm text-muted-foreground">Find your ideal business number. These are demo results — connect a telephony provider for live availability.</p>
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-border/70 bg-card p-6 shadow-[var(--shadow-card)] sm:p-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h3 className="font-display text-xl font-bold text-foreground">Search available numbers</h3>
+            <p className="mt-1 text-sm text-muted-foreground">Find clean carrier inventory with instant global activation.</p>
+          </div>
+          <Badge variant="success" className="self-start sm:self-auto">Instant Provisioning</Badge>
+        </div>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-3">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-muted-foreground">Country</label>
-          <select
-            value={selectedCountry}
-            onChange={(e) => setSelectedCountry(e.target.value)}
-            className="h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring"
-          >
-            {countries.map((c) => (
-              <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
-            ))}
-          </select>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-muted-foreground">Type</label>
-          <select
-            value={numberType}
-            onChange={(e) => setNumberType(e.target.value)}
-            className="h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring"
-          >
-            <option value="local">Local</option>
-            <option value="toll-free">Toll-Free</option>
-            <option value="mobile">Mobile</option>
-          </select>
-        </div>
-        <div className="flex flex-col justify-end">
-          <Button onClick={handleSearch} className="w-full">
-            <Search className="size-4" />
-            Search numbers
-          </Button>
-        </div>
-      </div>
-
-      {searched && (
-        <div className="mt-6 flex flex-col gap-3">
-          {results.map((num) => (
-            <div
-              key={num.id}
-              className="flex items-center justify-between rounded-xl border border-border/50 bg-secondary/30 p-4 transition-colors hover:bg-secondary/50"
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-muted-foreground">Country</label>
+            <select
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              className="h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring"
             >
-              <div className="flex items-center gap-4">
-                <span className="flex size-10 items-center justify-center rounded-lg bg-info/10 text-info">
-                  <Hash className="size-5" />
-                </span>
-                <div>
-                  <p className="font-mono text-sm font-semibold text-foreground">{num.formatted}</p>
-                  <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
-                    <MapPin className="size-3" />
-                    {num.country} · {num.region}
-                    <Badge variant="outline" className="ml-1 text-[10px]">{num.type}</Badge>
-                    {num.capabilities.map((c) => (
-                      <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
-                    ))}
+              {countries.map((c) => (
+                <option key={c.code} value={c.code}>{c.flag} {c.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-muted-foreground">Type</label>
+            <select
+              value={numberType}
+              onChange={(e) => setNumberType(e.target.value)}
+              className="h-9 rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none transition-colors focus:border-ring focus:ring-1 focus:ring-ring"
+            >
+              <option value="local">Local</option>
+              <option value="toll-free">Toll-Free</option>
+              <option value="mobile">Mobile</option>
+            </select>
+          </div>
+          <div className="flex flex-col justify-end">
+            <Button onClick={handleSearch} disabled={isSearching} className="w-full bg-brand-primary text-white">
+              <Search className="size-4 mr-1.5" />
+              {isSearching ? 'Searching...' : 'Search numbers'}
+            </Button>
+          </div>
+        </div>
+
+        {searched && (
+          <div className="mt-6 flex flex-col gap-3">
+            {results.map((num) => (
+              <div
+                key={num.id}
+                className="flex items-center justify-between rounded-xl border border-border/50 bg-secondary/30 p-4 transition-colors hover:bg-secondary/50"
+              >
+                <div className="flex items-center gap-4">
+                  <span className="flex size-10 items-center justify-center rounded-lg bg-info/10 text-info">
+                    <Hash className="size-5" />
+                  </span>
+                  <div>
+                    <p className="font-mono text-sm font-semibold text-foreground">{num.formatted}</p>
+                    <div className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+                      <MapPin className="size-3" />
+                      {num.country} · {num.region}
+                      <Badge variant="outline" className="ml-1 text-[10px]">{num.type}</Badge>
+                      {num.capabilities.map((c) => (
+                        <Badge key={c} variant="secondary" className="text-[10px]">{c}</Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-semibold text-foreground">${num.monthlyPrice}/mo</span>
+                  <Button size="sm" variant="outline" render={<Link href={`/register?number=${encodeURIComponent(num.formatted)}`} />}>
+                    Get number
+                  </Button>
+                </div>
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-sm font-semibold text-foreground">${num.monthlyPrice}/mo</span>
-                <Button size="sm" variant="outline">Get number</Button>
-              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Live Pricing Calculator Widget */}
+      <div className="rounded-2xl border border-border/70 bg-card/60 p-6 backdrop-blur-sm sm:p-8">
+        <h4 className="font-display text-lg font-bold text-foreground">Interactive Plan Estimator</h4>
+        <p className="mt-1 text-xs text-muted-foreground">Estimate monthly numbers expenditure for your global sales fleet.</p>
+
+        <div className="mt-5 grid grid-cols-1 gap-6 sm:grid-cols-2 items-center">
+          <div>
+            <div className="flex justify-between text-xs font-semibold">
+              <span className="text-muted-foreground">Fleet Size</span>
+              <span className="text-brand-primary font-mono">{quantity} Virtual Numbers</span>
             </div>
-          ))}
-          <p className="mt-2 text-center text-xs text-muted-foreground">
-            Demo data — connect a telephony provider for live number availability.
-          </p>
+            <input
+              type="range"
+              min={1}
+              max={50}
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              className="mt-2 w-full accent-brand-primary cursor-pointer"
+            />
+            <div className="mt-2 flex justify-between text-[11px] text-muted-foreground">
+              <span>1 number</span>
+              <span>25 numbers</span>
+              <span>50+ numbers</span>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-brand-primary/20 bg-brand-primary/5 p-4 text-center sm:text-right">
+            <span className="text-xs text-muted-foreground">Estimated Monthly Flat Rate</span>
+            <div className="font-display text-3xl font-extrabold text-foreground mt-1">
+              ${estimatedMonthly}
+              <span className="text-sm font-normal text-muted-foreground">/mo</span>
+            </div>
+            <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium block mt-1">
+              ✓ Includes full inbound WebRTC & call forwarding
+            </span>
+          </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }

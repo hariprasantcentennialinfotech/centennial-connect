@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { encodeSession, SESSION_COOKIE } from '@/lib/auth'
+import { createSessionToken, SESSION_COOKIE } from '@/lib/auth'
 import { getDatabase, ensureDbSeeded } from '@/lib/mongodb'
 
 const cookieOptions = {
@@ -108,15 +108,16 @@ export async function GET(request: NextRequest) {
     }
 
     // 4. Encode session and create redirect response
-    const sessionData = {
+    const token = await createSessionToken({
       name,
       email,
       avatarUrl,
       role: 'owner',
-    }
+      organizationId: 'org_default',
+    })
 
     const redirectResponse = NextResponse.redirect(new URL('/dashboard', origin))
-    redirectResponse.cookies.set(SESSION_COOKIE, encodeSession(sessionData), cookieOptions)
+    redirectResponse.cookies.set(SESSION_COOKIE, token, cookieOptions)
 
     return redirectResponse
   } catch (err: unknown) {

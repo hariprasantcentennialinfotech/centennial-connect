@@ -25,16 +25,32 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
-  dashboardStats,
-  callVolumeSeries,
-  successRateSeries,
-  durationSeries,
+  dashboardStats as initialStats,
+  callVolumeSeries as initialCallVolume,
+  successRateSeries as initialSuccessRate,
+  durationSeries as initialDuration,
   usageByProduct,
-  activityLog,
+  activityLog as initialActivity,
 } from '@/lib/mock-data'
+import { getDashboardAction } from '@/app/actions/analytics'
 
 export default function DashboardPage() {
   const [selectedProductFilter, setSelectedProductFilter] = React.useState('all')
+  const [stats, setStats] = React.useState(initialStats)
+  const [callVolume, setCallVolume] = React.useState(initialCallVolume)
+  const [activity, setActivity] = React.useState(initialActivity)
+
+  React.useEffect(() => {
+    getDashboardAction()
+      .then((res) => {
+        if (res.success && res.dashboard) {
+          if (res.dashboard.stats) setStats(res.dashboard.stats)
+          if (res.dashboard.callVolume) setCallVolume(res.dashboard.callVolume)
+          if (res.dashboard.activity) setActivity(res.dashboard.activity as typeof initialActivity)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="space-y-8">
@@ -86,46 +102,46 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <StatCard
           label="Total Calls"
-          value={dashboardStats[0].value}
-          delta={dashboardStats[0].delta}
+          value={stats[0]?.value ?? 3482}
+          delta={stats[0]?.delta ?? 12.4}
           icon={<PhoneCall className="size-5" />}
           sparklineData={[380, 420, 510, 480, 604, 566, 620]}
         />
         <StatCard
           label="Connected"
-          value={dashboardStats[1].value}
-          delta={dashboardStats[1].delta}
+          value={stats[1]?.value ?? 2189}
+          delta={stats[1]?.delta ?? 8.1}
           icon={<CheckCircle2 className="size-5" />}
           sparklineData={[240, 290, 340, 320, 402, 380, 410]}
           sparklineColor="var(--chart-2)"
         />
         <StatCard
           label="AI Calls"
-          value={dashboardStats[2].value}
-          delta={dashboardStats[2].delta}
+          value={stats[2]?.value ?? 964}
+          delta={stats[2]?.delta ?? 22.5}
           icon={<Bot className="size-5" />}
           sparklineData={[120, 150, 180, 210, 250, 280, 310]}
           sparklineColor="var(--brand-accent)"
         />
         <StatCard
           label="Outbound"
-          value={dashboardStats[3].value}
-          delta={dashboardStats[3].delta}
+          value={stats[3]?.value ?? 1876}
+          delta={stats[3]?.delta ?? 3.2}
           icon={<PhoneForwarded className="size-5" />}
           sparklineData={[260, 290, 310, 330, 360, 350, 390]}
         />
         <StatCard
           label="Minutes"
-          value="12.0k"
-          delta={dashboardStats[4].delta}
+          value={stats[4]?.value ? `${Math.round(stats[4].value / 1000)}k` : '12.0k'}
+          delta={stats[4]?.delta ?? 5.6}
           icon={<Clock className="size-5" />}
           sparklineData={[1400, 1600, 1900, 1800, 2200, 2100, 2400]}
         />
         <StatCard
           label="Active Lines"
-          value={dashboardStats[5].value}
+          value={stats[5]?.value ?? 4}
           icon={<Hash className="size-5" />}
-          description="4 active / 25 limit"
+          description={`${stats[5]?.value ?? 4} active / 25 limit`}
         />
       </div>
 
@@ -146,7 +162,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent className="pt-4">
             <BarChart
-              data={callVolumeSeries}
+              data={callVolume}
               height={240}
               showSecondary
               primaryLabel="Total Dialed"
@@ -265,7 +281,7 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/60">
-                {activityLog.map((log) => (
+                {activity.map((log) => (
                   <tr key={log.id} className="hover:bg-muted/40 transition-colors">
                     <td className="py-3.5 px-5 font-semibold text-foreground">
                       {log.contact}

@@ -17,6 +17,9 @@ import {
   Sliders,
   ShieldCheck,
   RefreshCw,
+  PhoneCall,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react'
 import { PageHeader } from '@/components/dashboard/page-header'
 import { StatCard } from '@/components/dashboard/stat-card'
@@ -25,31 +28,106 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { voiceAgents, sampleConversation } from '@/lib/mock-data'
+import { saveVoiceAgentAction, updateAgentStatusAction } from '@/app/actions/voice-agents'
+import { useTelephony } from '@/hooks/use-webrtc-call'
 import type { VoiceAgent } from '@/lib/types'
 
 export default function VoiceAgentPage() {
   const [agent, setAgent] = React.useState<VoiceAgent>(voiceAgents[0])
-  const [activeTab, setActiveTab] = React.useState<'config' | 'preview' | 'analytics'>('config')
+  const [activeTab, setActiveTab] = React.useState<'config' | 'preview'>('config')
   const [isSaving, setIsSaving] = React.useState(false)
-  const [saveSuccess, setSaveSuccess] = React.useState(false)
-  const [simulating, setSimulating] = React.useState(false)
+  const [saveToast, setSaveToast] = React.useState<{ text: string; isError?: boolean } | null>(null)
+  const [isTestCallOpen, setIsTestCallOpen] = React.useState(false)
+  const [playingTurnIndex, setPlayingTurnIndex] = React.useState<number | null>(null)
 
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSaving(true)
-    setTimeout(() => {
-      setIsSaving(false)
-      setSaveSuccess(true)
-      setTimeout(() => setSaveSuccess(false), 3000)
-    }, 800)
+  const telephony = useTelephony()
+
+  // Load agent data from API on mount
+  React.useEffect(() => {
+    fetch('/api/voice-agent')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.agent) {
+          setAgent(data.agent)
+        }
+      })
+      .catch((err) => {
+        console.warn('Fallback to initial agent:', err)
+      })
+  }, [])
+
+  const showToast = (text: string, isError = false) => {
+    setSaveToast({ text, isError })
+    setTimeout(() => setSaveToast(null), 4000)
   }
 
-  const toggleStatus = () => {
-    setAgent((prev) => ({
-      ...prev,
-      status: prev.status === 'active' ? 'paused' : 'active',
-    }))
+  // Save Agent Configuration
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSaving(true)
+    try {
+      const res = await saveVoiceAgentAction(agent)
+      if (res && 'agent' in res && res.agent) {
+        setAgent(res.agent as VoiceAgent)
+        showToast('Agent persona and instructions saved successfully!')
+      } else {
+        showToast((res as { error?: string })?.error || 'Failed to save agent.', true)
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Error saving agent.', true)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Toggle Active/Paused Status
+  const toggleStatus = async () => {
+    const nextStatus = agent.status === 'active' ? 'paused' : 'active'
+    try {
+      setAgent((prev) => ({ ...prev, status: nextStatus }))
+      await updateAgentStatusAction(agent.id, nextStatus)
+      showToast(`Agent status updated to ${nextStatus}`)
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Status update failed', true)
+    }
+  }
+
+  // Start Live WebRTC In-Browser Test Call with the Agent
+  const handleStartWebRTCCall = () => {
+    setIsTestCallOpen(false)
+    telephony.startCall(agent.phoneNumber, `${agent.name} (AI Concierge)`)
+    showToast(`Connecting in-browser call to ${agent.name}...`)
+  }
+
+  // Play dialogue turn using browser speech synthesis
+  const speakTurn = (text: string, index: number, isAgent: boolean) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 1.05
+    utterance.pitch = isAgent ? 1.15 : 0.95
+
+    // Attempt to pick an appropriate English voice if available
+    const voices = window.speechSynthesis.getVoices()
+    if (isAgent) {
+      const female = voices.find((v) => v.name.includes('Female') || v.name.includes('Zira') || v.name.includes('Samantha'))
+      if (female) utterance.voice = female
+    }
+
+    setPlayingTurnIndex(index)
+    utterance.onend = () => setPlayingTurnIndex(null)
+    utterance.onerror = () => setPlayingTurnIndex(null)
+
+    window.speechSynthesis.speak(utterance)
   }
 
   return (
@@ -77,25 +155,32 @@ export default function VoiceAgentPage() {
             {agent.status === 'active' ? 'Agent Active' : 'Agent Paused'}
           </Button>
 
+          {/* Test Call Trigger */}
           <Button
-            onClick={() => {
-              setActiveTab('preview')
-              setSimulating(true)
-              setTimeout(() => setSimulating(false), 2000)
-            }}
+            onClick={() => setIsTestCallOpen(true)}
             className="gap-2 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/90 shadow-md shadow-brand-primary/20"
           >
-            <Play className="size-4" />
-            Test Conversation
+            <PhoneCall className="size-4" />
+            Live WebRTC Call
           </Button>
         </div>
       </PageHeader>
 
-      {/* Success Notification */}
-      {saveSuccess && (
-        <div className="flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
-          <CheckCircle2 className="size-4 shrink-0 text-emerald-500" />
-          <span>Agent configuration and instructions saved successfully to MongoDB!</span>
+      {/* Toast Notification */}
+      {saveToast && (
+        <div
+          className={`flex items-center gap-2 rounded-xl border p-4 text-xs font-semibold animate-in fade-in duration-200 ${
+            saveToast.isError
+              ? 'bg-destructive/10 border-destructive/30 text-destructive'
+              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400'
+          }`}
+        >
+          {saveToast.isError ? (
+            <AlertCircle className="size-4 shrink-0" />
+          ) : (
+            <CheckCircle2 className="size-4 shrink-0" />
+          )}
+          <span>{saveToast.text}</span>
         </div>
       )}
 
@@ -156,7 +241,7 @@ export default function VoiceAgentPage() {
           }`}
         >
           <MessageSquare className="size-4" />
-          Live Transcript & Simulation
+          Live Transcript & Speech Simulation
         </button>
       </div>
 
@@ -180,6 +265,7 @@ export default function VoiceAgentPage() {
                       value={agent.name}
                       onChange={(e) => setAgent({ ...agent, name: e.target.value })}
                       className="mt-1.5 h-9 rounded-xl text-xs bg-muted/40"
+                      required
                     />
                   </div>
                   <div>
@@ -188,6 +274,7 @@ export default function VoiceAgentPage() {
                       value={agent.phoneNumber}
                       onChange={(e) => setAgent({ ...agent, phoneNumber: e.target.value })}
                       className="mt-1.5 h-9 rounded-xl text-xs font-mono bg-muted/40"
+                      required
                     />
                   </div>
                 </div>
@@ -199,6 +286,7 @@ export default function VoiceAgentPage() {
                     value={agent.greeting}
                     onChange={(e) => setAgent({ ...agent, greeting: e.target.value })}
                     className="mt-1.5 rounded-xl text-xs bg-muted/40"
+                    required
                   />
                   <span className="text-[11px] text-muted-foreground">
                     Spoken immediately when a customer answers or connects.
@@ -222,6 +310,7 @@ export default function VoiceAgentPage() {
                     value={agent.objective}
                     onChange={(e) => setAgent({ ...agent, objective: e.target.value })}
                     className="mt-1.5 h-9 rounded-xl text-xs bg-muted/40"
+                    required
                   />
                 </div>
 
@@ -234,6 +323,7 @@ export default function VoiceAgentPage() {
                     value={agent.instructions}
                     onChange={(e) => setAgent({ ...agent, instructions: e.target.value })}
                     className="mt-1.5 rounded-xl text-xs font-mono bg-muted/40"
+                    required
                   />
                 </div>
 
@@ -246,6 +336,7 @@ export default function VoiceAgentPage() {
                     value={agent.businessContext}
                     onChange={(e) => setAgent({ ...agent, businessContext: e.target.value })}
                     className="mt-1.5 rounded-xl text-xs bg-muted/40"
+                    required
                   />
                 </div>
 
@@ -255,7 +346,7 @@ export default function VoiceAgentPage() {
                     disabled={isSaving}
                     className="gap-2 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/90"
                   >
-                    <Save className="size-4" />
+                    {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                     {isSaving ? 'Saving Changes...' : 'Save Agent Persona'}
                   </Button>
                 </div>
@@ -276,12 +367,13 @@ export default function VoiceAgentPage() {
                   <select
                     value={agent.voice}
                     onChange={(e) => setAgent({ ...agent, voice: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs"
+                    className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs outline-none focus:border-brand-primary"
                   >
                     <option value="Aria (Warm, Female)">Aria (Warm, Natural Female)</option>
-                    <option value="Liam (Energetic, Male)">Liam (Energetic, Professional Male)</option>
-                    <option value="Sophia (Calm, Executive)">Sophia (Calm, Executive Female)</option>
-                    <option value="Marcus (Authoritative, Deep)">Marcus (Authoritative, Deep Male)</option>
+                    <option value="Nova (Neutral, Female)">Nova (Neutral, Conversational Female)</option>
+                    <option value="Atlas (Deep, Male)">Atlas (Deep, Authoritative Male)</option>
+                    <option value="Rowan (Calm, Male)">Rowan (Calm, Friendly Male)</option>
+                    <option value="Sage (Bright, Neutral)">Sage (Bright, Dynamic Neutral)</option>
                   </select>
                 </div>
 
@@ -290,12 +382,13 @@ export default function VoiceAgentPage() {
                   <select
                     value={agent.language}
                     onChange={(e) => setAgent({ ...agent, language: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs"
+                    className="mt-1.5 w-full rounded-xl border border-border bg-background px-3 py-2 text-xs outline-none focus:border-brand-primary"
                   >
                     <option value="English (US)">English (United States)</option>
                     <option value="English (UK)">English (United Kingdom)</option>
                     <option value="Spanish (ES)">Spanish (Spain / LatAm)</option>
                     <option value="German (DE)">German (Germany)</option>
+                    <option value="French (FR)">French (France)</option>
                   </select>
                 </div>
 
@@ -330,21 +423,20 @@ export default function VoiceAgentPage() {
             <div>
               <CardTitle className="text-base font-bold">Live Conversation Transcript</CardTitle>
               <CardDescription className="text-xs">
-                Real-time speech-to-text dialogue stream with latency markers
+                Real-time dialogue stream with instant audio speech playback
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setSimulating(true)
-                setTimeout(() => setSimulating(false), 1500)
-              }}
-              className="gap-1.5 rounded-xl text-xs"
-            >
-              <RefreshCw className={`size-3.5 ${simulating ? 'animate-spin' : ''}`} />
-              Replay Audio
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleStartWebRTCCall}
+                className="gap-1.5 rounded-xl text-xs text-brand-primary border-brand-primary/30"
+              >
+                <PhoneCall className="size-3.5" />
+                Live WebRTC Call
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="p-6">
             <div className="space-y-4 max-w-2xl mx-auto">
@@ -362,7 +454,7 @@ export default function VoiceAgentPage() {
                   )}
 
                   <div
-                    className={`max-w-md rounded-2xl p-4 leading-relaxed ${
+                    className={`max-w-md rounded-2xl p-4 leading-relaxed relative group ${
                       turn.speaker === 'agent'
                         ? 'bg-card border border-border/80 text-foreground shadow-sm'
                         : 'bg-brand-primary text-white shadow-sm'
@@ -370,9 +462,20 @@ export default function VoiceAgentPage() {
                   >
                     <div className="flex items-center justify-between gap-4 mb-1 text-[10px] opacity-70">
                       <span className="font-bold uppercase tracking-wider">
-                        {turn.speaker === 'agent' ? 'Aria (AI)' : 'Prospect (Inbound)'}
+                        {turn.speaker === 'agent' ? agent.name : 'Customer (Inbound)'}
                       </span>
-                      <span>00:{10 * (i + 1)}</span>
+                      <div className="flex items-center gap-2">
+                        <span>00:{10 * (i + 1)}</span>
+                        {/* Audio Speak Button */}
+                        <button
+                          type="button"
+                          onClick={() => speakTurn(turn.text, i, turn.speaker === 'agent')}
+                          title="Listen to synthesized voice"
+                          className="hover:text-primary transition-colors p-0.5 rounded"
+                        >
+                          <Volume2 className={`size-3.5 ${playingTurnIndex === i ? 'text-brand-primary animate-pulse' : ''}`} />
+                        </button>
+                      </div>
                     </div>
                     <p>{turn.text}</p>
                   </div>
@@ -388,6 +491,42 @@ export default function VoiceAgentPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Test Call Modal */}
+      <Dialog open={isTestCallOpen} onOpenChange={setIsTestCallOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold">Test AI Agent Call</DialogTitle>
+            <DialogDescription className="text-xs">
+              Connect to {agent.name} directly via your browser microphone using in-browser WebRTC.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <div className="rounded-xl border border-brand-primary/20 bg-brand-primary/5 p-4 text-xs">
+              <div className="flex items-center gap-2 font-bold text-foreground">
+                <Bot className="size-4 text-brand-primary" />
+                <span>{agent.name} • {agent.voice}</span>
+              </div>
+              <p className="mt-1 text-muted-foreground text-[11px]">
+                Greeting: &quot;{agent.greeting}&quot;
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Button
+                onClick={handleStartWebRTCCall}
+                className="w-full gap-2 rounded-xl bg-brand-primary text-white hover:bg-brand-primary/90 h-11"
+              >
+                <PhoneCall className="size-4" />
+                Start In-Browser WebRTC Call
+              </Button>
+              <p className="text-center text-[11px] text-muted-foreground">
+                No phone line needed. Uses your device microphone and browser audio.
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

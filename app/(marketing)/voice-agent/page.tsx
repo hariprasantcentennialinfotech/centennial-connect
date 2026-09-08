@@ -16,6 +16,7 @@ import {
   Settings,
   Sparkles,
   TrendingUp,
+  Volume2,
   Zap,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -45,15 +46,59 @@ const faqs = [
 ]
 
 function AgentDashboardPreview() {
+  const [selectedVoice, setSelectedVoice] = React.useState('Aria (Warm, Female)')
+  const [activeSpeechIdx, setActiveSpeechIdx] = React.useState<number | null>(null)
   const agent = voiceAgents[0]
+
+  const playVoiceSample = (text: string, idx: number, isAgent: boolean) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    window.speechSynthesis.cancel()
+
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.rate = 1.05
+    utterance.pitch = isAgent ? (selectedVoice.includes('Male') ? 0.9 : 1.15) : 1.0
+
+    setActiveSpeechIdx(idx)
+    utterance.onend = () => setActiveSpeechIdx(null)
+    utterance.onerror = () => setActiveSpeechIdx(null)
+
+    window.speechSynthesis.speak(utterance)
+  }
+
   return (
     <div className="rounded-2xl border border-border/70 bg-card p-6 shadow-[var(--shadow-card)] sm:p-8">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-lg font-bold text-foreground">Agent Dashboard</h3>
-        <Badge variant="outline" className="text-success border-success/30 bg-success/10">
-          <span className="mr-1.5 size-1.5 rounded-full bg-success" />
-          Active
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h3 className="font-display text-lg font-bold text-foreground">Interactive Agent Studio Preview</h3>
+          <p className="text-xs text-muted-foreground">Select a voice persona below and listen to turn-by-turn dialogue.</p>
+        </div>
+        <Badge variant="outline" className="text-success border-success/30 bg-success/10 self-start sm:self-auto">
+          <span className="mr-1.5 size-1.5 rounded-full bg-success animate-pulse" />
+          Autonomous AI Active
         </Badge>
+      </div>
+
+      {/* Voice Audition Chips */}
+      <div className="mt-5 flex flex-wrap gap-2">
+        {voices.map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => {
+              setSelectedVoice(v)
+              playVoiceSample(`Hi, this is ${v.split(' ')[0]}. How can I help you today?`, -1, true)
+            }}
+            className={cn(
+              'rounded-xl px-3 py-1.5 text-xs font-semibold transition-all border flex items-center gap-1.5',
+              selectedVoice === v
+                ? 'bg-brand-primary text-white border-brand-primary shadow-sm'
+                : 'bg-secondary/40 border-border/70 text-muted-foreground hover:bg-secondary hover:text-foreground'
+            )}
+          >
+            <Volume2 className="size-3.5" />
+            <span>{v}</span>
+          </button>
+        ))}
       </div>
 
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -62,41 +107,31 @@ function AgentDashboardPreview() {
           <p className="mt-1 font-display text-sm font-bold text-foreground">{agent.name}</p>
         </div>
         <div className="rounded-xl border border-border/50 bg-secondary/30 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Voice</p>
-          <p className="mt-1 text-sm font-semibold text-foreground">{agent.voice}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Active Voice</p>
+          <p className="mt-1 text-sm font-semibold text-foreground font-mono">{selectedVoice}</p>
         </div>
         <div className="rounded-xl border border-border/50 bg-secondary/30 p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Language</p>
           <p className="mt-1 text-sm font-semibold text-foreground">{agent.language}</p>
         </div>
-        <div className="rounded-xl border border-border/50 bg-secondary/30 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Phone Number</p>
-          <p className="mt-1 font-mono text-sm font-semibold text-foreground">{agent.phoneNumber}</p>
-        </div>
-        <div className="rounded-xl border border-border/50 bg-secondary/30 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Call Volume</p>
-          <p className="mt-1 font-display text-lg font-bold text-foreground">
-            <Counter value={agent.callVolume} />
-          </p>
-        </div>
-        <div className="rounded-xl border border-border/50 bg-secondary/30 p-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Success Rate</p>
-          <p className="mt-1 font-display text-lg font-bold text-success">
-            <Counter value={agent.successRate} suffix="%" />
-          </p>
-        </div>
       </div>
 
-      {/* Conversation preview */}
+      {/* Conversation preview with turn playback */}
       <div className="mt-6 rounded-xl border border-border/50 bg-secondary/30 p-4">
-        <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sample conversation</h4>
+        <div className="flex items-center justify-between">
+          <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Sample conversation • Click speaker to listen
+          </h4>
+          <span className="text-[10px] text-muted-foreground">Turn-by-turn Speech</span>
+        </div>
+
         <div className="mt-4 flex flex-col gap-3">
           {sampleConversation.map((turn, i) => (
             <div
               key={i}
               className={cn(
                 'flex gap-3',
-                turn.speaker === 'agent' ? '' : 'flex-row-reverse',
+                turn.speaker === 'agent' ? '' : 'flex-row-reverse'
               )}
             >
               <span
@@ -104,19 +139,26 @@ function AgentDashboardPreview() {
                   'flex size-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold',
                   turn.speaker === 'agent'
                     ? 'bg-violet/10 text-violet'
-                    : 'bg-info/10 text-info',
+                    : 'bg-info/10 text-info'
                 )}
               >
                 {turn.speaker === 'agent' ? <Bot className="size-4" /> : 'C'}
               </span>
               <div
                 className={cn(
-                  'max-w-[80%] rounded-xl px-4 py-2.5 text-sm leading-relaxed',
+                  'max-w-[80%] rounded-xl px-4 py-2.5 text-sm leading-relaxed relative group cursor-pointer',
                   turn.speaker === 'agent'
                     ? 'bg-violet/5 text-foreground'
-                    : 'bg-info/5 text-foreground',
+                    : 'bg-info/5 text-foreground'
                 )}
+                onClick={() => playVoiceSample(turn.text, i, turn.speaker === 'agent')}
               >
+                <div className="flex items-center justify-between gap-4 mb-1">
+                  <span className="text-[10px] font-semibold opacity-70 uppercase tracking-wider">
+                    {turn.speaker === 'agent' ? selectedVoice.split(' ')[0] : 'Prospect'}
+                  </span>
+                  <Volume2 className={cn('size-3.5 text-muted-foreground', activeSpeechIdx === i && 'text-brand-primary animate-pulse')} />
+                </div>
                 {turn.text}
               </div>
             </div>

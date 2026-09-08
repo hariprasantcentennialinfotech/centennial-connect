@@ -141,10 +141,12 @@ export function DonutChart({
   data,
   className,
   centerLabel,
+  size,
 }: {
   data: TimeSeriesPoint[]
   className?: string
   centerLabel?: string
+  size?: number
 }) {
   const total = data.reduce((sum, d) => sum + d.value, 0) || 1
   const radius = 60
@@ -205,10 +207,12 @@ export function Sparkline({
   data,
   className,
   tone = 'var(--chart-1)',
+  color,
 }: {
   data: number[]
   className?: string
   tone?: string
+  color?: string
 }) {
   const width = 100
   const height = 32
@@ -226,7 +230,7 @@ export function Sparkline({
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className={cn('h-8 w-24', className)} preserveAspectRatio="none">
-      <path d={path} fill="none" stroke={tone} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={path} fill="none" stroke={color || tone} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   )
 }
