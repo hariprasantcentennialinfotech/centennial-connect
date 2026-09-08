@@ -5,20 +5,39 @@ import { Sidebar } from '@/components/dashboard/sidebar'
 import { TopBar } from '@/components/dashboard/top-bar'
 import { X } from 'lucide-react'
 
+export interface DashboardUser {
+  name: string
+  email: string
+  avatarUrl?: string
+  avatarInitials?: string
+  role?: string
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
-
-  // Demo user data or loaded from session
-  const user = {
+  const [user, setUser] = React.useState<DashboardUser>({
     name: 'Alex Morgan',
     email: 'alex@northwind.co',
     avatarInitials: 'AM',
     role: 'owner',
-  }
+  })
+
+  React.useEffect(() => {
+    fetch('/api/auth/me')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.user) {
+          setUser(data.user)
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not load user profile in layout:', err)
+      })
+  }, [])
 
   return (
     <div className="flex min-h-screen bg-background text-foreground antialiased selection:bg-brand-primary selection:text-white">

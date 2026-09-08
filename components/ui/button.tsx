@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { Button as ButtonPrimitive } from '@base-ui/react/button'
 import { cva, type VariantProps } from 'class-variance-authority'
 
@@ -40,18 +41,50 @@ const buttonVariants = cva(
   },
 )
 
+export interface ButtonProps
+  extends ButtonPrimitive.Props,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean
+}
+
 function Button({
   className,
   variant = 'default',
   size = 'default',
+  asChild,
+  render,
+  nativeButton,
+  children,
   ...props
-}: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {
+}: ButtonProps) {
+  // If asChild is provided (e.g. <Button asChild><Link href="...">...</Link></Button>),
+  // use the child element as the render target
+  let finalRender = render
+  let finalChildren = children
+
+  if (asChild && React.isValidElement(children)) {
+    finalRender = children
+    finalChildren = undefined
+  }
+
+  // If a render target is supplied and it's not explicitly a <button>,
+  // default nativeButton to false to prevent Base UI console errors
+  const isCustomElement = Boolean(finalRender)
+  const isExplicitButton =
+    React.isValidElement(finalRender) && typeof finalRender.type === 'string' && finalRender.type === 'button'
+  const resolvedNativeButton =
+    nativeButton !== undefined ? nativeButton : isCustomElement ? isExplicitButton : true
+
   return (
     <ButtonPrimitive
       data-slot="button"
       className={cn(buttonVariants({ variant, size, className }))}
+      render={finalRender}
+      nativeButton={resolvedNativeButton}
       {...props}
-    />
+    >
+      {finalChildren}
+    </ButtonPrimitive>
   )
 }
 

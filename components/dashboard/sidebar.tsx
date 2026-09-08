@@ -36,6 +36,7 @@ interface SidebarProps {
   user?: {
     name: string
     email: string
+    avatarUrl?: string
     avatarInitials?: string
     role?: string
   }
@@ -141,9 +142,17 @@ export function Sidebar({ user }: SidebarProps) {
       <div className="border-t border-border/60 p-3">
         <div className="flex items-center justify-between gap-3 rounded-xl p-2 hover:bg-muted/60 transition-colors">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-primary font-display text-xs font-bold text-white shadow-sm">
-              {user?.avatarInitials || user?.name?.slice(0, 2).toUpperCase() || 'CC'}
-            </div>
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                className="size-9 shrink-0 rounded-full object-cover border border-border shadow-sm"
+              />
+            ) : (
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-primary font-display text-xs font-bold text-white shadow-sm">
+                {user?.avatarInitials || user?.name?.slice(0, 2).toUpperCase() || 'CC'}
+              </div>
+            )}
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-semibold text-foreground">
                 {user?.name || 'Administrator'}

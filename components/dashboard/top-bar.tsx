@@ -27,6 +27,7 @@ interface TopBarProps {
   user?: {
     name: string
     email: string
+    avatarUrl?: string
     avatarInitials?: string
   }
 }
@@ -126,10 +127,18 @@ export function TopBar({ onMenuClick, user }: TopBarProps) {
           {/* User Avatar */}
           <Link
             href="/dashboard/settings"
-            className="flex size-9 items-center justify-center rounded-xl bg-brand-primary/10 text-xs font-bold text-brand-primary ring-1 ring-brand-primary/30 transition-transform hover:scale-105"
+            className="flex size-9 items-center justify-center rounded-xl bg-brand-primary/10 text-xs font-bold text-brand-primary ring-1 ring-brand-primary/30 transition-transform hover:scale-105 overflow-hidden"
             title="Settings & Profile"
           >
-            {user?.avatarInitials || user?.name?.slice(0, 2).toUpperCase() || 'CC'}
+            {user?.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name || 'User'}
+                className="size-full object-cover"
+              />
+            ) : (
+              user?.avatarInitials || user?.name?.slice(0, 2).toUpperCase() || 'CC'
+            )}
           </Link>
         </div>
       </header>
