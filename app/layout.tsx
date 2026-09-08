@@ -39,6 +39,13 @@ export const metadata: Metadata = {
     description: 'One platform for smarter business calling.',
     type: 'website',
   },
+  icons: {
+    icon: [
+      { url: '/favicon.png', type: 'image/png' },
+    ],
+    shortcut: '/favicon.png',
+    apple: '/favicon.png',
+  },
 }
 
 export const viewport: Viewport = {
