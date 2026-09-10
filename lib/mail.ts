@@ -1,8 +1,15 @@
 import nodemailer from 'nodemailer'
 
-const host = process.env.MAIL_HOST || 'smtp.gmail.com'
+if (!process.env.MAIL_USER || !process.env.MAIL_PASS) {
+  console.warn(
+    '[mail.ts] MAIL_USER and/or MAIL_PASS are not set. ' +
+    'Email sending will fail. Set these values in your .env file.'
+  )
+}
+
+const host = process.env.MAIL_HOST ?? 'smtp.gmail.com'
 const port = Number(process.env.MAIL_PORT) || 587
-const user = process.env.MAIL_USER || 'centennialinfotech@gmail.com'
+const user = process.env.MAIL_USER ?? ''
 const pass = process.env.MAIL_PASS ? process.env.MAIL_PASS.replace(/^["']|["']$/g, '') : ''
 const secure = process.env.MAIL_SECURE === 'true'
 
@@ -29,9 +36,13 @@ export interface SendMailParams {
 }
 
 export async function sendContactEmail(params: SendMailParams) {
-  const fromEmail = process.env.MAIL_FROM_EMAIL || user
-  const fromName = process.env.MAIL_FROM_NAME || 'Centennial Infotech'
-  const recipient = process.env.MAIL_USER || 'centennialinfotech@gmail.com'
+  const fromEmail = process.env.MAIL_FROM_EMAIL ?? process.env.MAIL_USER ?? ''
+  const fromName = process.env.MAIL_FROM_NAME ?? 'Centennial Infotech'
+  const recipient = process.env.MAIL_USER ?? ''
+
+  if (!recipient) {
+    throw new Error('MAIL_USER is not configured. Cannot send contact email.')
+  }
 
   const htmlContent = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #eaeaea; border-radius: 12px; background: #ffffff;">

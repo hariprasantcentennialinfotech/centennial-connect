@@ -15,8 +15,8 @@ export async function sendMail(
   subject: string,
   htmlContent: string
 ): Promise<SendMailResult> {
-  const fromEmail = process.env.MAIL_FROM_EMAIL || 'hariprasant.centennialinfotech@gmail.com'
-  const fromName = process.env.MAIL_FROM_NAME || 'Centennial Infotech'
+  const fromEmail = process.env.MAIL_FROM_EMAIL ?? ''
+  const fromName = process.env.MAIL_FROM_NAME ?? 'Centennial Infotech'
 
   // 1️⃣ Option A: Try Resend (if configured)
   if (process.env.RESEND_API_KEY) {

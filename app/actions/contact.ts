@@ -118,7 +118,10 @@ export async function submitContactForm(
   `
 
   try {
-    const adminEmail = process.env.MAIL_USER || 'centennialinfotech@gmail.com'
+    const adminEmail = process.env.MAIL_USER
+    if (!adminEmail) {
+      throw new Error('MAIL_USER is not configured.')
+    }
     
     // 1. Send notification to Centennial Infotech team
     await sendMail(
@@ -141,7 +144,7 @@ export async function submitContactForm(
     const msg = err instanceof Error ? err.message : String(err)
     console.error('Contact email dispatch failed:', msg)
     return {
-      error: 'We could not send your message right now. Please try again or email us directly at centennialinfotech@gmail.com.',
+      error: 'We could not send your message right now. Please try again later or contact us through our support page.',
     }
   }
 }
